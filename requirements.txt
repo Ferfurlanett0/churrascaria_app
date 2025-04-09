@@ -1,0 +1,2 @@
+tkinter==0.0.0  # Normalmente já vem com Python
+pyinstaller==6.0.0  # Para gerar executável

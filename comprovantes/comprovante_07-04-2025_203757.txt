@@ -1,0 +1,14 @@
+CHURRASCARIA DELÍCIA
+Rua dos Sabores, 123
+CNPJ: 12.345.678/0001-99
+07-04-2025 20:37:57
+========================================
+* coca coca                    R$   12.00
+Almoço Executivo               R$   25.00
+Almoço Premium                 R$   35.00
+Almoço Vegetariano             R$   22.00
+========================================
+TOTAL                         R$   94.00
+========================================
+Obrigado pela preferência!
+Volte sempre!
