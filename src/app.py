@@ -9,6 +9,8 @@ import sys
 import base64
 from datetime import datetime
 
+
+
 class ChurrascariaApp:
     def __init__(self):
         # Dados do cardápio
