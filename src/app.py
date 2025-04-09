@@ -9,8 +9,6 @@ import sys
 import base64
 from datetime import datetime
 
-
-
 class ChurrascariaApp:
     def __init__(self):
         # Dados do cardápio
@@ -481,7 +479,13 @@ class ChurrascariaApp:
                     
                     if (opcao) {{
                         pywebview.api.imprimir_comprovante().then(res => {{
-                            if (!res.success) {{
+                            if (res.success) {{
+                                // Limpa o pedido e CPF após impressão
+                                document.getElementById('cpf-cnpj').value = '';
+                                pywebview.api.limpar_pedido().then(() => {{
+                                    atualizarPedido();
+                                }});
+                            }} else {{
                                 alert(res.message);
                             }}
                         }}).catch(err => {{
@@ -489,16 +493,19 @@ class ChurrascariaApp:
                         }});
                     }} else {{
                         pywebview.api.salvar_comprovante().then(res => {{
-                            if (!res.success) {{
+                            if (res.success) {{
+                                // Limpa o pedido e CPF após salvar
+                                document.getElementById('cpf-cnpj').value = '';
+                                pywebview.api.limpar_pedido().then(() => {{
+                                    atualizarPedido();
+                                }});
+                            }} else {{
                                 alert(res.message);
                             }}
                         }}).catch(err => {{
                             console.error('Erro ao salvar:', err);
                         }});
                     }}
-                    
-                    document.getElementById('cpf-cnpj').value = '';
-                    atualizarPedido();
                 }} else {{
                     alert(resultado.message);
                 }}
@@ -685,6 +692,12 @@ class ChurrascariaApp:
             "total": sum(item['item']['preco'] * item['quantidade'] for item in self.pedido_atual)
         }
 
+    def limpar_pedido(self):
+        """Limpa o pedido atual e o CPF/CNPJ"""
+        self.pedido_atual = []
+        self.cpf_cnpj = ""
+        return {"success": True}
+
     def validar_cpf_cnpj(self, documento):
         """Valida o CPF/CNPJ"""
         documento = re.sub(r'[^0-9]', '', documento)
@@ -817,6 +830,9 @@ class ChurrascariaApp:
                 if not webview.util.is_webview_installed():
                     print("WebView2 Runtime não está instalado. Tentando instalar...")
                     webview.util.install_webview2()
+            
+            # Expõe a função limpar_pedido para o JavaScript
+            self.window.expose(self.limpar_pedido)
             
             # Inicia a aplicação normalmente
             webview.start()
