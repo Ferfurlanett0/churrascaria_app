@@ -58,7 +58,7 @@ class ChurrascariaApp:
         self.window = webview.create_window(
             'Sistema Churrascaria',
             html=self.get_html(),
-            width=1300,
+            width=1450,
             height=900,
             resizable=True,
             text_select=True,
@@ -753,17 +753,38 @@ class ChurrascariaApp:
         return cabecalho + itens + rodape
 
     def imprimir_comprovante(self):
-        """Imprime o comprovante diretamente"""
+        """Imprime o comprovante diretamente sem diálogo de salvar"""
         try:
-            temp_path = os.path.join(tempfile.gettempdir(), "comprovante_churrascaria.txt")
-            with open(temp_path, 'w', encoding='utf-8') as f:
-                f.write(self.comprovante)
-            
-            if self.verificar_impressoras():
-                os.startfile(temp_path, "print")
-                return {"success": True, "message": "Comprovante enviado para impressão!"}
-            else:
+            if not self.verificar_impressoras():
                 return {"success": False, "message": "Nenhuma impressora encontrada!"}
+            
+            # Obtém a impressora padrão
+            printer_name = win32print.GetDefaultPrinter()
+            
+            # Abre a impressora
+            hprinter = win32print.OpenPrinter(printer_name)
+            
+            try:
+                # Inicia um trabalho de impressão
+                job_info = ("Comprovante Churrascaria", None, "RAW")
+                job_id = win32print.StartDocPrinter(hprinter, 1, job_info)
+                
+                try:
+                    win32print.StartPagePrinter(hprinter)
+                    
+                    # Converte o texto para bytes (UTF-8)
+                    comprovante_bytes = self.comprovante.encode('utf-8')
+                    
+                    # Envia o texto para impressão
+                    win32print.WritePrinter(hprinter, comprovante_bytes)
+                    
+                    win32print.EndPagePrinter(hprinter)
+                finally:
+                    win32print.EndDocPrinter(hprinter)
+            finally:
+                win32print.ClosePrinter(hprinter)
+            
+            return {"success": True, "message": "Comprovante enviado para impressão!"}
         except Exception as e:
             return {"success": False, "message": f"Erro ao imprimir: {str(e)}"}
 
