@@ -32,10 +32,14 @@ class ChurrascariaApp:
         self.pedido_atual = []
         self.cpf_cnpj = ""
         self.comprovante = ""
+        self.entrega = False
+        self.nome_cliente = ""
+        self.endereco_entrega = ""
+        self.taxa_entrega = 5.00  # Valor fixo da taxa de entrega
         
         # Informações sobre o sistema
         self.sobre_info = {
-            "versao": "2.3",
+            "versao": "2.4",
             "desenvolvedor": "Churrascaria Sabor Gaúcho LTDA",
             "cnpj": "12.345.678/0001-99",
             "contato": "contato@churrascaria.com.br",
@@ -44,6 +48,7 @@ class ChurrascariaApp:
         }
         
         self.historico_versoes = [
+            "v2.4 (15/10/2023) - Adicionado sistema de entrega com taxa",
             "v2.3 (15/09/2023) - Adicionado controle de quantidade por item",
             "v2.2 (15/08/2023) - Adicionada interface moderna",
             "v2.1 (15/07/2023) - Adicionado campo CPF/CNPJ",
@@ -76,7 +81,9 @@ class ChurrascariaApp:
             self.get_pedido_atual,
             self.imprimir_comprovante,
             self.salvar_comprovante,
-            self.atualizar_quantidade
+            self.atualizar_quantidade,
+            self.set_entrega,
+            self.set_dados_entrega
         )
 
     def get_html(self):
@@ -159,6 +166,13 @@ class ChurrascariaApp:
             min-width: 80px;
             text-align: right;
         }}
+        .entrega-section {{
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            display: none;
+        }}
     </style>
 </head>
 <body>
@@ -233,6 +247,24 @@ class ChurrascariaApp:
                         <div class="mb-3">
                             <label class="form-label">CPF/CNPJ (opcional):</label>
                             <input type="text" class="form-control" id="cpf-cnpj" placeholder="000.000.000-00">
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="entrega-checkbox" onchange="toggleEntrega()">
+                            <label class="form-check-label" for="entrega-checkbox">
+                                É para entrega? (Taxa: R$ {self.taxa_entrega:.2f})
+                            </label>
+                        </div>
+                        
+                        <div class="entrega-section" id="entrega-section">
+                            <div class="mb-3">
+                                <label class="form-label">Nome do Cliente:</label>
+                                <input type="text" class="form-control" id="nome-cliente" placeholder="Nome completo">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Endereço de Entrega:</label>
+                                <textarea class="form-control" id="endereco-entrega" rows="3" placeholder="Rua, número, bairro, complemento"></textarea>
+                            </div>
                         </div>
                         
                         <ul class="list-group mb-3" id="lista-pedido">
@@ -355,6 +387,34 @@ class ChurrascariaApp:
             return true;
         }}
 
+        // Função para mostrar/ocultar seção de entrega
+        function toggleEntrega() {{
+            const checkbox = document.getElementById('entrega-checkbox');
+            const entregaSection = document.getElementById('entrega-section');
+            
+            if (checkbox.checked) {{
+                entregaSection.style.display = 'block';
+                pywebview.api.set_entrega(true).then(() => {{
+                    atualizarPedido();
+                }});
+            }} else {{
+                entregaSection.style.display = 'none';
+                pywebview.api.set_entrega(false).then(() => {{
+                    atualizarPedido();
+                }});
+            }}
+        }}
+
+        // Função para atualizar dados de entrega
+        function atualizarDadosEntrega() {{
+            const nome = document.getElementById('nome-cliente').value;
+            const endereco = document.getElementById('endereco-entrega').value;
+            
+            pywebview.api.set_dados_entrega(nome, endereco).catch(err => {{
+                console.error('Erro ao atualizar dados de entrega:', err);
+            }});
+        }}
+
         // Funções para o pedido
         function adicionarItem(id) {{
             if (!checkAPI()) return;
@@ -447,6 +507,25 @@ class ChurrascariaApp:
                     lista.appendChild(li);
                 }});
                 
+                // Adiciona taxa de entrega se aplicável
+                if (data.entrega) {{
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item bg-light';
+                    li.innerHTML = `
+                        <div class="item-pedido">
+                            <div class="item-info">
+                                <strong>Taxa de Entrega</strong>
+                            </div>
+                            <div class="item-controles">
+                                <div class="item-valor">
+                                    R$ ${{data.taxa_entrega.toFixed(2)}}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    lista.appendChild(li);
+                }}
+                
                 totalElement.textContent = `R$ ${{data.total.toFixed(2)}}`;
             }}).catch(err => {{
                 console.error('Erro ao atualizar pedido:', err);
@@ -470,48 +549,76 @@ class ChurrascariaApp:
             if (!checkAPI()) return;
             
             const cpf = document.getElementById('cpf-cnpj').value;
+            const entrega = document.getElementById('entrega-checkbox').checked;
             
-            pywebview.api.finalizar_pedido(cpf).then(resultado => {{
-                if (resultado.success) {{
-                    // Mostra opções ao usuário
-                    const opcao = confirm('Pedido finalizado!\\nTotal: R$ ' + resultado.total.toFixed(2) + 
-                                  '\\n\\nDeseja imprimir o comprovante?\\n(Cancelar para apenas salvar)');
-                    
-                    if (opcao) {{
-                        pywebview.api.imprimir_comprovante().then(res => {{
-                            if (res.success) {{
-                                // Limpa o pedido e CPF após impressão
-                                document.getElementById('cpf-cnpj').value = '';
-                                pywebview.api.limpar_pedido().then(() => {{
-                                    atualizarPedido();
-                                }});
-                            }} else {{
-                                alert(res.message);
-                            }}
-                        }}).catch(err => {{
-                            console.error('Erro ao imprimir:', err);
-                        }});
-                    }} else {{
-                        pywebview.api.salvar_comprovante().then(res => {{
-                            if (res.success) {{
-                                // Limpa o pedido e CPF após salvar
-                                document.getElementById('cpf-cnpj').value = '';
-                                pywebview.api.limpar_pedido().then(() => {{
-                                    atualizarPedido();
-                                }});
-                            }} else {{
-                                alert(res.message);
-                            }}
-                        }}).catch(err => {{
-                            console.error('Erro ao salvar:', err);
-                        }});
-                    }}
-                }} else {{
-                    alert(resultado.message);
+            if (entrega) {{
+                const nome = document.getElementById('nome-cliente').value.trim();
+                const endereco = document.getElementById('endereco-entrega').value.trim();
+                
+                if (!nome || !endereco) {{
+                    alert('Por favor, preencha todos os dados de entrega!');
+                    return;
                 }}
-            }}).catch(err => {{
-                console.error('Erro ao finalizar pedido:', err);
-            }});
+                
+                // Atualiza os dados de entrega antes de finalizar
+                pywebview.api.set_dados_entrega(nome, endereco).then(() => {{
+                    pywebview.api.finalizar_pedido(cpf).then(resultado => {{
+                        processarFinalizacao(resultado);
+                    }});
+                }});
+            }} else {{
+                pywebview.api.finalizar_pedido(cpf).then(resultado => {{
+                    processarFinalizacao(resultado);
+                }});
+            }}
+        }}
+        
+        function processarFinalizacao(resultado) {{
+            if (resultado.success) {{
+                // Mostra opções ao usuário
+                const opcao = confirm('Pedido finalizado!\\nTotal: R$ ' + resultado.total.toFixed(2) + 
+                          '\\n\\nDeseja imprimir o comprovante?\\n(Cancelar para apenas salvar)');
+                
+                if (opcao) {{
+                    pywebview.api.imprimir_comprovante().then(res => {{
+                        if (res.success) {{
+                            // Limpa o pedido e CPF após impressão
+                            document.getElementById('cpf-cnpj').value = '';
+                            document.getElementById('entrega-checkbox').checked = false;
+                            document.getElementById('nome-cliente').value = '';
+                            document.getElementById('endereco-entrega').value = '';
+                            document.getElementById('entrega-section').style.display = 'none';
+                            pywebview.api.limpar_pedido().then(() => {{
+                                atualizarPedido();
+                            }});
+                        }} else {{
+                            alert(res.message);
+                        }}
+                    }}).catch(err => {{
+                        console.error('Erro ao imprimir:', err);
+                    }});
+                }} else {{
+                    pywebview.api.salvar_comprovante().then(res => {{
+                        if (res.success) {{
+                            // Limpa o pedido e CPF após salvar
+                            document.getElementById('cpf-cnpj').value = '';
+                            document.getElementById('entrega-checkbox').checked = false;
+                            document.getElementById('nome-cliente').value = '';
+                            document.getElementById('endereco-entrega').value = '';
+                            document.getElementById('entrega-section').style.display = 'none';
+                            pywebview.api.limpar_pedido().then(() => {{
+                                atualizarPedido();
+                            }});
+                        }} else {{
+                            alert(res.message);
+                        }}
+                    }}).catch(err => {{
+                        console.error('Erro ao salvar:', err);
+                    }});
+                }}
+            }} else {{
+                alert(resultado.message);
+            }}
         }}
         
         // Funções para o modal Sobre
@@ -687,15 +794,34 @@ class ChurrascariaApp:
 
     def get_pedido_atual(self):
         """Retorna o estado atual do pedido"""
+        total_itens = sum(item['item']['preco'] * item['quantidade'] for item in self.pedido_atual)
+        total = total_itens + (self.taxa_entrega if self.entrega else 0)
+        
         return {
             "itens": self.pedido_atual,
-            "total": sum(item['item']['preco'] * item['quantidade'] for item in self.pedido_atual)
+            "total": total,
+            "entrega": self.entrega,
+            "taxa_entrega": self.taxa_entrega
         }
+
+    def set_entrega(self, entrega):
+        """Define se o pedido é para entrega"""
+        self.entrega = entrega
+        return {"success": True}
+
+    def set_dados_entrega(self, nome, endereco):
+        """Define os dados de entrega"""
+        self.nome_cliente = nome
+        self.endereco_entrega = endereco
+        return {"success": True}
 
     def limpar_pedido(self):
         """Limpa o pedido atual e o CPF/CNPJ"""
         self.pedido_atual = []
         self.cpf_cnpj = ""
+        self.entrega = False
+        self.nome_cliente = ""
+        self.endereco_entrega = ""
         return {"success": True}
 
     def validar_cpf_cnpj(self, documento):
@@ -735,8 +861,13 @@ class ChurrascariaApp:
         if not validacao['valid']:
             return {"success": False, "message": "CPF/CNPJ inválido! Digite 11 dígitos para CPF ou 14 para CNPJ."}
         
+        # Valida dados de entrega se necessário
+        if self.entrega and (not self.nome_cliente or not self.endereco_entrega):
+            return {"success": False, "message": "Preencha todos os dados de entrega!"}
+        
         # Calcula o total
-        total = sum(item['item']['preco'] * item['quantidade'] for item in self.pedido_atual)
+        total_itens = sum(item['item']['preco'] * item['quantidade'] for item in self.pedido_atual)
+        total = total_itens + (self.taxa_entrega if self.entrega else 0)
         self.comprovante = self.gerar_comprovante(total)
         
         return {"success": True, "total": total}
@@ -749,6 +880,9 @@ class ChurrascariaApp:
         
         if self.cpf_cnpj:
             cabecalho += f"{self.cpf_cnpj}\n"
+            
+        if self.entrega:
+            cabecalho += f"\nENTREGA PARA:\n{self.nome_cliente}\n{self.endereco_entrega}\n"
         
         cabecalho += "="*40 + "\n"
         
@@ -760,6 +894,12 @@ class ChurrascariaApp:
             itens += f"{quantidade}x {item['nome'].ljust(25)} R$ {item['preco']:6.2f} = R$ {subtotal:7.2f}\n"
         
         rodape = "="*40 + "\n"
+        
+        if self.entrega:
+            total_itens = sum(item['item']['preco'] * item['quantidade'] for item in self.pedido_atual)
+            rodape += f"Subtotal{' ' * 30}R$ {total_itens:7.2f}\n"
+            rodape += f"Taxa de Entrega{' ' * 24}R$ {self.taxa_entrega:7.2f}\n"
+        
         rodape += f"TOTAL{' ' * 35}R$ {total:7.2f}\n"
         rodape += "="*40 + "\n"
         rodape += "Obrigado pela preferência!\n"
