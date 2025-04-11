@@ -1,0 +1,25 @@
+[
+  {
+    "data_hora": "2025-04-11T13:34:50.050098",
+    "cliente": "Não identificado",
+    "itens": [
+      {
+        "id": 1,
+        "nome": "Almoço Executivo",
+        "preco": 25.0,
+        "quantidade": 1,
+        "categoria": "refeicao"
+      },
+      {
+        "id": 3,
+        "nome": "Almoço Vegetariano",
+        "preco": 22.0,
+        "quantidade": 1,
+        "categoria": "refeicao"
+      }
+    ],
+    "total": 47.0,
+    "forma_pagamento": "dinheiro",
+    "entrega": false
+  }
+]
